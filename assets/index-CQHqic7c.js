@@ -138,8 +138,10 @@ function TopRatedMovie({
       <span class="rate-value">${voteAverage}</span>
     </div>
     <div class="title">${title}</div>
-    <button class="primary detail">자세히 보기</button>
   `;
+  $topRatedMovie.append(
+    Button({ className: "detail", textContent: "자세히 보기" })
+  );
   return $topRatedMovie;
 }
 const $mainSection = document.querySelector("main section");
