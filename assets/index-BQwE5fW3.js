@@ -404,10 +404,10 @@ const _Modal = class _Modal extends Component {
       </div>
       <div class="modal-description">
         ${Skeleton({ width: 300, height: 40 }).outerHTML}
-        <p class="rate">
+        <p class="modal-rate rate">
           ${Skeleton({ width: 370, height: 25 }).outerHTML}
         </p>
-        <p class="detail">
+        <p class="modal-detail">
           ${Skeleton({ width: 150, height: 30 }).outerHTML}
         </p>
       </div>
@@ -445,27 +445,27 @@ const _Modal = class _Modal extends Component {
               </div>
               <div class="modal-description">
                 <h2 class="modal-title">${this.state.title}</h2>
-                <p class="category">
+                <p class="modal-category">
                   ${this.state.release_date} · ${this.state.genres.join(", ")}
                 </p>
-                <p class="rate">
-                  <span class="rate-average">평균</span>
+                <p class="modal-rate rate">
+                  <span class="modal-rate-average">평균</span>
                   <img src="./images/star_filled.png" class="star" alt="star" /><span
                     >${this.state.vote_average}</span
                   >
                 </p>
                 <hr />
                 <p class="modal-subtitle">내 별점</p>
-                <div class="rate-star">
+                <div class="modal-rate-star">
                   <div>${this.renderRatingStar()}</div>
                   <div>
-                    <span class="rate-description">${ratingDescriptions[this.state.my_rate]}</span>
-                    <span class="rate-scale">(${this.state.my_rate}/10)</span>
+                    <span class="modal-rate-description">${ratingDescriptions[this.state.my_rate]}</span>
+                    <span class="modal-rate-scale">(${this.state.my_rate}/10)</span>
                   </div>
                 </div>
                 <hr />
                 <p class="modal-subtitle">줄거리</p>
-                <p class="detail">${this.state.overview}</p>
+                <p class="modal-detail">${this.state.overview}</p>
               </div>
             `
       )}
@@ -546,7 +546,7 @@ const checkAndLoadMoreItems = () => {
   const viewportHeight = window.innerHeight;
   const scrollY = window.scrollY;
   const documentHeight = document.documentElement.scrollHeight;
-  const scrolledToBottom = viewportHeight + scrollY >= documentHeight;
+  const scrolledToBottom = viewportHeight + scrollY >= documentHeight - 150;
   if (scrolledToBottom) loadMoreItems();
 };
 const loadMoreItems = async () => {
@@ -689,7 +689,8 @@ const EVENT_TYPES = {
 };
 const eventBus$1 = EventBus.getInstance();
 const SELECTORS = {
-  modalClose: "#closeModal",
+  closeModalButton: "#closeModal",
+  modalBackground: ".modal-background",
   movieItem: ".thumbnail-list .item, .top-rated-button",
   searchInput: ".top-rated-search-input",
   ratingStar: ".star"
@@ -699,8 +700,14 @@ window.addEventListener("click", async (event) => {
   if (!isElement(target)) return;
   const elementMap = [
     {
-      selector: SELECTORS.modalClose,
-      action: () => eventBus$1.emit(EVENT_TYPES.modalClose)
+      selector: SELECTORS.closeModalButton,
+      action: () => eventBus$1.emit(EVENT_TYPES.modalClose),
+      matchMethod: "closest"
+    },
+    {
+      selector: SELECTORS.modalBackground,
+      action: () => eventBus$1.emit(EVENT_TYPES.modalClose),
+      matchMethod: "matches"
     },
     {
       selector: SELECTORS.movieItem,
@@ -709,7 +716,8 @@ window.addEventListener("click", async (event) => {
         const movieId = Number(movieItem.dataset.movieId);
         if (!movieId) return;
         eventBus$1.emit(EVENT_TYPES.modalOpen, movieId);
-      }
+      },
+      matchMethod: "closest"
     },
     {
       selector: SELECTORS.ratingStar,
@@ -717,11 +725,12 @@ window.addEventListener("click", async (event) => {
         if (!starImg || !isImage(starImg)) return;
         const newRating = Number(starImg.dataset.value);
         eventBus$1.emit(EVENT_TYPES.setRating, newRating);
-      }
+      },
+      matchMethod: "closest"
     }
   ];
-  for (const { selector, action } of elementMap) {
-    const element = target.closest(selector);
+  for (const { selector, action, matchMethod } of elementMap) {
+    const element = matchMethod === "matches" ? target.matches(selector) ? target : null : target.closest(selector);
     if (!element) continue;
     action(element);
     return;
