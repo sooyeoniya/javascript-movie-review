@@ -76,17 +76,23 @@ const MOVIE_API = {
   endPoints: {
     movies: {
       popular: "movie/popular",
-      search: "search/movie"
+      search: "search/movie",
+      genre: "genre/movie/list"
     }
+  },
+  defaultParams: {
+    language: "ko-KR"
   }
 };
 const createMovieApiUrl = (endpoint, params) => {
-  const searchParams = new URLSearchParams(params);
+  const searchParams = new URLSearchParams({
+    ...MOVIE_API.defaultParams,
+    ...params
+  });
   return `${MOVIE_API.BaseUrl}/${endpoint}?${searchParams.toString()}`;
 };
 async function getMovies({ page }) {
   const url = createMovieApiUrl(MOVIE_API.endPoints.movies.popular, {
-    language: "ko-KR",
     page: String(page)
   });
   return fetchWithErrorHandling(url);
@@ -95,16 +101,19 @@ async function searchMovies({ page, title }) {
   const url = createMovieApiUrl(MOVIE_API.endPoints.movies.search, {
     query: String(title),
     include_adult: "false",
-    language: "ko-KR",
     page: String(page)
   });
+  return fetchWithErrorHandling(url);
+}
+async function getGenres() {
+  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.genre);
   return fetchWithErrorHandling(url);
 }
 const isErrorResponse = (response) => {
   return "error" in response;
 };
 function handleApiResponse(response, callbacks) {
-  if (isErrorResponse(response)) {
+  if (callbacks.onError && isErrorResponse(response)) {
     callbacks.onError(response.error);
     return;
   }
@@ -132,17 +141,6 @@ class Component {
     return this.$element;
   }
 }
-function Button({
-  className = "",
-  textContent,
-  type = "button"
-}) {
-  const $button = document.createElement("button");
-  $button.className = `primary ${className}`;
-  $button.textContent = textContent;
-  $button.type = type;
-  return $button;
-}
 const _Footer = class _Footer extends Component {
   createElement() {
     const $footer = document.createElement("footer");
@@ -169,6 +167,17 @@ const _Footer = class _Footer extends Component {
 };
 __publicField(_Footer, "instance");
 let Footer = _Footer;
+function Button({
+  className = "",
+  textContent,
+  type = "button"
+}) {
+  const $button = document.createElement("button");
+  $button.className = `primary ${className}`;
+  $button.textContent = textContent;
+  $button.type = type;
+  return $button;
+}
 function Skeleton({ width, height }) {
   const $skeletonContainer = document.createElement("div");
   $skeletonContainer.className = "skeleton";
@@ -239,16 +248,18 @@ const _Header = class _Header extends Component {
         /*html*/
         `
         <div class="top-rated-container">
-          <div class="top-rated-movie"  data-movie-id="${this.state.id}">
+          <div class="top-rated-movie">
             ${this.state.isLoading ? this.renderSkeletonItem() : (
           /*html*/
           `
                   <div class="rate">
-                    <img src="./images/star_empty.png" class="star" alt="star_empty" />
+                    <img src="./images/star_empty.png" class="star" alt="star" />
                     <span class="rate-value">${this.state.voteAverage}</span>
                   </div>
                   <div class="title">${this.state.title}</div>
+                  <div class="top-rated-button" data-movie-id="${this.state.id}">
                   ${Button({ className: "detail", textContent: "자세히 보기" }).outerHTML}
+                  </div>
                 `
         )}
           </div>
@@ -309,7 +320,7 @@ const _Main = class _Main extends Component {
           />
           <div class="item-desc">
             <p class="rate loading">
-              <img src="./images/star_empty.png" class="star" alt="star_empty" /><span
+              <img src="./images/star_empty.png" class="star" alt="star" /><span
                 >${movie.vote_average}</span
               >
             </p>
@@ -352,15 +363,26 @@ const _Main = class _Main extends Component {
 };
 __publicField(_Main, "instance");
 let Main = _Main;
+const ratingDescriptions = {
+  0: "별점을 선택해주세요",
+  2: "최악이에요",
+  4: "별로예요",
+  6: "보통이에요",
+  8: "재미있어요",
+  10: "명작이에요"
+};
 const _Modal = class _Modal extends Component {
   constructor() {
     super({
+      id: null,
       title: null,
       poster_path: null,
       vote_average: null,
       overview: null,
-      genre_ids: [],
-      isLoading: true
+      genres: [],
+      release_date: null,
+      isLoading: true,
+      my_rate: 0
     });
   }
   createElement() {
@@ -378,7 +400,7 @@ const _Modal = class _Modal extends Component {
       /*html*/
       `
       <div class="modal-image">
-        ${Skeleton({ width: 500, height: 700 }).outerHTML}
+        ${Skeleton({ width: 350, height: 570 }).outerHTML}
       </div>
       <div class="modal-description">
         ${Skeleton({ width: 300, height: 40 }).outerHTML}
@@ -392,6 +414,20 @@ const _Modal = class _Modal extends Component {
     `
     );
   }
+  renderRatingStar() {
+    const totalStars = 5;
+    const filledStars = this.state.my_rate / 2;
+    const starsHtml = Array.from({ length: totalStars }, (_, i) => {
+      const starType = i + 1 <= filledStars ? "filled" : "empty";
+      return `<img 
+        src="./images/star_${starType}.png" 
+        class="star" 
+        data-value="${(i + 1) * 2}"
+        alt="star"
+      />`;
+    }).join("");
+    return starsHtml;
+  }
   template() {
     return (
       /*html*/
@@ -400,30 +436,38 @@ const _Modal = class _Modal extends Component {
         <button class="close-modal" id="closeModal">
           <img src="./images/modal_button_close.png" />
         </button>
-        <div class="modal-container">
+        <div class="modal-container" data-movie-id="${this.state.id}">
           ${this.state.isLoading ? this.renderSkeletonItem() : (
         /*html*/
         `
-          <div class="modal-image">
-            <img src="${PREFIX_POSTER_PATH}${this.state.poster_path}" />
-          </div>
-          <div class="modal-description">
-            <h2>${this.state.title}</h2>
-            <p class="category">
-              2024 · 모험, 애니메이션, 코미디, 드라마, 가족
-            </p>
-            <p class="rate">
-              <span class="rate-average">평균</span>
-              <img src="./images/star_filled.png" class="star" /><span
-                >${this.state.vote_average}</span
-              >
-            </p>
-            <hr />
-            <p class="detail">
-              ${this.state.overview}
-            </p>
-          </div>
-        `
+              <div class="modal-image">
+                <img src="${PREFIX_POSTER_PATH}${this.state.poster_path}" />
+              </div>
+              <div class="modal-description">
+                <h2 class="modal-title">${this.state.title}</h2>
+                <p class="category">
+                  ${this.state.release_date} · ${this.state.genres.join(", ")}
+                </p>
+                <p class="rate">
+                  <span class="rate-average">평균</span>
+                  <img src="./images/star_filled.png" class="star" alt="star" /><span
+                    >${this.state.vote_average}</span
+                  >
+                </p>
+                <hr />
+                <p class="modal-subtitle">내 별점</p>
+                <div class="rate-star">
+                  <div>${this.renderRatingStar()}</div>
+                  <div>
+                    <span class="rate-description">${ratingDescriptions[this.state.my_rate]}</span>
+                    <span class="rate-scale">(${this.state.my_rate}/10)</span>
+                  </div>
+                </div>
+                <hr />
+                <p class="modal-subtitle">줄거리</p>
+                <p class="detail">${this.state.overview}</p>
+              </div>
+            `
       )}
         </div>
       </div>
@@ -434,13 +478,14 @@ const _Modal = class _Modal extends Component {
     this.$element.classList.add("active");
     this.setState({
       isLoading: false,
+      id: movieData.id,
       title: movieData.title,
       poster_path: movieData.poster_path,
       vote_average: movieData.vote_average,
       overview: movieData.overview,
-      genre_ids: movieData.genre_ids
-      // TODO: 외부 or 내부에서 genre_ids를 API로 받아서 가공해서 처리 (genre_ids 타입 재정의?)
-      // TODO: 내부 데이터로 만들어서 임시처리 ?
+      genres: movieData.genres,
+      release_date: movieData.release_date,
+      my_rate: movieData.my_rate
     });
   }
   close() {
@@ -448,6 +493,9 @@ const _Modal = class _Modal extends Component {
   }
   isActive() {
     return this.$element.classList.contains("active");
+  }
+  getMovieId() {
+    return this.state.id;
   }
 };
 __publicField(_Modal, "instance");
@@ -465,15 +513,11 @@ const _App = class _App extends Component {
   render() {
     const $container = document.createElement("div");
     $container.className = "container";
-    const $showMore = Button({
-      className: "show-more",
-      textContent: "더 보기"
-    });
     const $main = Main.getInstance().getElement();
     const $header = Header.getInstance().getElement();
     const $modal = Modal.getInstance().getElement();
     const $footer = Footer.getInstance().getElement();
-    $container.append($main, $showMore);
+    $container.append($main);
     this.$element.append($header, $container, $footer, $modal);
   }
 };
@@ -483,13 +527,40 @@ const store = {
   page: 1,
   totalPages: 1,
   movies: [],
-  searchKeyword: ""
+  searchKeyword: "",
+  genres: []
 };
-const toggleShowMoreButton = () => {
-  const $showMore = document.querySelector(".show-more");
-  if (store.page !== Math.min(MAX_MOVIE_PAGE, store.totalPages))
-    $showMore == null ? void 0 : $showMore.classList.add("open");
-  else $showMore == null ? void 0 : $showMore.classList.remove("open");
+let isLoading = false;
+let hasReachedEnd = false;
+const initInfiniteScroll = () => {
+  window.removeEventListener("scroll", handleScroll);
+  isLoading = false;
+  hasReachedEnd = false;
+  window.addEventListener("scroll", handleScroll);
+};
+const handleScroll = () => {
+  if (isLoading || hasReachedEnd) return;
+  checkAndLoadMoreItems();
+};
+const checkAndLoadMoreItems = () => {
+  const viewportHeight = window.innerHeight;
+  const scrollY = window.scrollY;
+  const documentHeight = document.documentElement.scrollHeight;
+  const scrolledToBottom = viewportHeight + scrollY >= documentHeight;
+  if (scrolledToBottom) loadMoreItems();
+};
+const loadMoreItems = async () => {
+  if (hasReachedEnd || isLoading || store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages)) {
+    hasReachedEnd = true;
+    return;
+  }
+  isLoading = true;
+  store.page = store.page + 1;
+  await updateMoviesList();
+  isLoading = false;
+};
+const checkLastPage = () => {
+  return store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages);
 };
 const setHeaderData = () => {
   const header = Header.getInstance();
@@ -509,6 +580,7 @@ const renderTotalList = async (main) => {
     onSuccess: (data) => {
       store.movies = [...store.movies, ...data.results];
       store.totalPages = data.total_pages;
+      if (checkLastPage()) hasReachedEnd = true;
       setHeaderData();
       main.setState({
         movies: store.movies,
@@ -520,6 +592,7 @@ const renderTotalList = async (main) => {
         isLoading: false,
         error
       });
+      isLoading = false;
     }
   });
 };
@@ -533,6 +606,7 @@ const renderSearchList = async (main) => {
     onSuccess: (data) => {
       store.movies = [...store.movies, ...data.results];
       store.totalPages = data.total_pages;
+      if (checkLastPage()) hasReachedEnd = true;
       main.setState({
         movies: store.movies,
         isLoading: false,
@@ -544,7 +618,14 @@ const renderSearchList = async (main) => {
         isLoading: false,
         error
       });
+      isLoading = false;
     }
+  });
+};
+const getGenreList = async () => {
+  const genreResponse = await getGenres();
+  handleApiResponse(genreResponse, {
+    onSuccess: (data) => store.genres = data.genres
   });
 };
 const updateMoviesList = async () => {
@@ -552,7 +633,7 @@ const updateMoviesList = async () => {
   if (store.searchKeyword === "") await renderTotalList(main);
   else await renderSearchList(main);
   main.render();
-  toggleShowMoreButton();
+  if (store.page === 1) initInfiniteScroll();
 };
 const initializeLayout = async () => {
   const $app = document.querySelector("#app");
@@ -597,27 +678,26 @@ const isForm = (target) => {
 const isInput = (target) => {
   return target instanceof HTMLInputElement;
 };
+const isImage = (target) => {
+  return target instanceof HTMLImageElement;
+};
 const EVENT_TYPES = {
   modalOpen: "modal-open",
   modalClose: "modal-close",
-  showMore: "show-more",
-  search: "search"
+  search: "search",
+  setRating: "set-rating"
 };
 const eventBus$1 = EventBus.getInstance();
 const SELECTORS = {
-  showMore: ".show-more",
   modalClose: "#closeModal",
-  movieItem: ".thumbnail-list .item, .top-rated-movie",
-  searchInput: ".top-rated-search-input"
+  movieItem: ".thumbnail-list .item, .top-rated-button",
+  searchInput: ".top-rated-search-input",
+  ratingStar: ".star"
 };
 window.addEventListener("click", async (event) => {
   const { target } = event;
   if (!isElement(target)) return;
   const elementMap = [
-    {
-      selector: SELECTORS.showMore,
-      action: () => eventBus$1.emit(EVENT_TYPES.showMore)
-    },
     {
       selector: SELECTORS.modalClose,
       action: () => eventBus$1.emit(EVENT_TYPES.modalClose)
@@ -629,6 +709,14 @@ window.addEventListener("click", async (event) => {
         const movieId = Number(movieItem.dataset.movieId);
         if (!movieId) return;
         eventBus$1.emit(EVENT_TYPES.modalOpen, movieId);
+      }
+    },
+    {
+      selector: SELECTORS.ratingStar,
+      action: (starImg) => {
+        if (!starImg || !isImage(starImg)) return;
+        const newRating = Number(starImg.dataset.value);
+        eventBus$1.emit(EVENT_TYPES.setRating, newRating);
       }
     }
   ];
@@ -657,17 +745,92 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 });
+class LocalStorage {
+  get(key) {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  }
+  set(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  remove(key) {
+    localStorage.removeItem(key);
+  }
+  clear() {
+    localStorage.clear();
+  }
+}
+const _UserMovieRatingStorage = class _UserMovieRatingStorage {
+  constructor() {
+    __publicField(this, "storage", new LocalStorage());
+  }
+  static getInstance() {
+    if (!_UserMovieRatingStorage.instance)
+      _UserMovieRatingStorage.instance = new _UserMovieRatingStorage();
+    return _UserMovieRatingStorage.instance;
+  }
+  getRatings() {
+    return this.storage.get(
+      _UserMovieRatingStorage.MOVIE_RATING_KEY
+    ) ?? [];
+  }
+  setRating(rating) {
+    const ratings = this.getRatings();
+    const existingIndex = ratings.findIndex(
+      (r) => r.movieId === rating.movieId
+    );
+    if (existingIndex >= 0) ratings[existingIndex] = rating;
+    else ratings.push(rating);
+    this.storage.set(
+      _UserMovieRatingStorage.MOVIE_RATING_KEY,
+      ratings
+    );
+  }
+  removeRating(movieId) {
+    const ratings = this.getRatings();
+    const filteredRatings = ratings.filter((r) => r.movieId !== movieId);
+    this.storage.set(_UserMovieRatingStorage.MOVIE_RATING_KEY, filteredRatings);
+  }
+  clearAllRatings() {
+    this.storage.remove(_UserMovieRatingStorage.MOVIE_RATING_KEY);
+  }
+};
+__publicField(_UserMovieRatingStorage, "instance");
+__publicField(_UserMovieRatingStorage, "MOVIE_RATING_KEY", "movieRatingKey");
+let UserMovieRatingStorage = _UserMovieRatingStorage;
 const eventBus = EventBus.getInstance();
-eventBus.on(EVENT_TYPES.modalOpen, (movieId) => {
+eventBus.on(EVENT_TYPES.modalOpen, async (movieId) => {
+  var _a;
   const movieData = store.movies.find((m) => m.id === movieId);
-  if (movieData) Modal.getInstance().open(movieData);
+  if (!movieData) return;
+  await getGenreList();
+  const {
+    genre_ids,
+    title,
+    poster_path,
+    vote_average,
+    overview,
+    release_date
+  } = movieData;
+  const genres = store.genres.filter(({ id }) => genre_ids.includes(id)).map(({ name }) => name);
+  const releaseDate = release_date.split("-")[0];
+  const ratings = UserMovieRatingStorage.getInstance().getRatings();
+  const myRate = ((_a = ratings.find((r) => r.movieId === movieId)) == null ? void 0 : _a.rate) ?? 0;
+  const finalMovieData = {
+    id: movieId,
+    title,
+    poster_path,
+    vote_average,
+    overview,
+    genres,
+    release_date: releaseDate,
+    isLoading: false,
+    my_rate: myRate
+  };
+  Modal.getInstance().open(finalMovieData);
 });
 eventBus.on(EVENT_TYPES.modalClose, () => {
   Modal.getInstance().close();
-});
-eventBus.on(EVENT_TYPES.showMore, async () => {
-  store.page = store.page + 1;
-  await updateMoviesList();
 });
 eventBus.on(EVENT_TYPES.search, async (value) => {
   store.searchKeyword = value;
@@ -680,6 +843,15 @@ eventBus.on(EVENT_TYPES.search, async (value) => {
   });
   Header.getInstance().setState({ hasSearched: true });
   await updateMoviesList();
+});
+eventBus.on(EVENT_TYPES.setRating, (newRating) => {
+  const currentMovieId = Modal.getInstance().getMovieId();
+  if (!currentMovieId) return;
+  UserMovieRatingStorage.getInstance().setRating({
+    movieId: currentMovieId,
+    rate: newRating
+  });
+  Modal.getInstance().setState({ my_rate: newRating });
 });
 addEventListener("load", () => {
   initializeLayout();
