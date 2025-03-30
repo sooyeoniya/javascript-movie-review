@@ -178,11 +178,21 @@ function Button({
   $button.type = type;
   return $button;
 }
-function Skeleton({ width, height }) {
+function Skeleton({
+  width = "",
+  height = "",
+  className = "",
+  style = {}
+}) {
   const $skeletonContainer = document.createElement("div");
-  $skeletonContainer.className = "skeleton";
-  $skeletonContainer.style.width = `${width}px`;
-  $skeletonContainer.style.height = `${height}px`;
+  $skeletonContainer.className = `skeleton ${className}`.trim();
+  $skeletonContainer.style.width = typeof width === "number" ? `${width}px` : width;
+  $skeletonContainer.style.height = typeof height === "number" ? `${height}px` : height;
+  Object.entries(style).forEach(([key, value]) => {
+    if (value !== void 0 && value !== null) {
+      $skeletonContainer.style.setProperty(key, String(value));
+    }
+  });
   return $skeletonContainer;
 }
 const _Header = class _Header extends Component {
@@ -296,10 +306,12 @@ const _Main = class _Main extends Component {
       `
       <li>
         <div class="item">
-          ${Skeleton({ width: 200, height: 300 }).outerHTML}
+          ${Skeleton({
+        className: "thumbnail-skeleton"
+      }).outerHTML}
           <div class="item-desc">
-            ${Skeleton({ width: 60, height: 15 }).outerHTML}
-            ${Skeleton({ width: 150, height: 20 }).outerHTML}
+            ${Skeleton({ width: "30%", height: 15 }).outerHTML}
+            ${Skeleton({ width: "75%", height: 20 }).outerHTML}
           </div> 
         </div> 
       </li>
