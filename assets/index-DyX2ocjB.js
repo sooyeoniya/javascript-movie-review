@@ -38,87 +38,6 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     fetch(link.href, fetchOpts);
   }
 })();
-async function fetchWithErrorHandling(url) {
-  const options = {
-    method: "GET",
-    headers: {
-      accept: "application/json",
-      Authorization: `Bearer ${"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1NDljNDczODg1ZmVjMjQxYzIzOTNkYWVlNDkwYzMwMiIsIm5iZiI6MTc0Mjg3OTA3Ny4xOCwic3ViIjoiNjdlMjM5NjU0NDBmMzExYWNlNzVkNWEwIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.qpqb60AR3c7Qc-BOPMm-vOvEx_v4_hJETbJpmQFAnYw"}`
-    }
-  };
-  try {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-      switch (response.status) {
-        case 400:
-          return {
-            error: "검색 가능한 페이지 수를 넘겼습니다."
-          };
-        case 401:
-          return {
-            error: "사용자 인증 정보가 잘못되었습니다."
-          };
-        default:
-          return {
-            error: `에러가 발생했습니다. (${response.status})`
-          };
-      }
-    }
-    return response.json();
-  } catch (error) {
-    return {
-      error: `에러가 발생했습니다. ${error}`
-    };
-  }
-}
-const MOVIE_API = {
-  BaseUrl: "https://api.themoviedb.org/3",
-  endPoints: {
-    movies: {
-      popular: "movie/popular",
-      search: "search/movie",
-      genre: "genre/movie/list"
-    }
-  },
-  defaultParams: {
-    language: "ko-KR"
-  }
-};
-const createMovieApiUrl = (endpoint, params) => {
-  const searchParams = new URLSearchParams({
-    ...MOVIE_API.defaultParams,
-    ...params
-  });
-  return `${MOVIE_API.BaseUrl}/${endpoint}?${searchParams.toString()}`;
-};
-async function getMovies({ page }) {
-  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.popular, {
-    page: String(page)
-  });
-  return fetchWithErrorHandling(url);
-}
-async function searchMovies({ page, title }) {
-  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.search, {
-    query: String(title),
-    include_adult: "false",
-    page: String(page)
-  });
-  return fetchWithErrorHandling(url);
-}
-async function getGenres() {
-  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.genre);
-  return fetchWithErrorHandling(url);
-}
-const isErrorResponse = (response) => {
-  return "error" in response;
-};
-function handleApiResponse(response, callbacks) {
-  if (callbacks.onError && isErrorResponse(response)) {
-    callbacks.onError(response.error);
-    return;
-  }
-  callbacks.onSuccess(response);
-}
 class Component {
   constructor(initialState) {
     __publicField(this, "$element");
@@ -415,12 +334,12 @@ const _Modal = class _Modal extends Component {
         ${Skeleton({ width: 350, height: 570 }).outerHTML}
       </div>
       <div class="modal-description">
-        ${Skeleton({ width: 300, height: 40 }).outerHTML}
+        ${Skeleton({ width: 280, height: 30, style: { margin: "0 0 10px 0" } }).outerHTML}
         <p class="modal-rate rate">
-          ${Skeleton({ width: 370, height: 25 }).outerHTML}
+          ${Skeleton({ width: 330, height: 25 }).outerHTML}
         </p>
         <p class="modal-detail">
-          ${Skeleton({ width: 150, height: 30 }).outerHTML}
+          ${Skeleton({ width: 150, height: 30, style: { margin: "10px 0" } }).outerHTML}
         </p>
       </div>
     `
@@ -488,6 +407,7 @@ const _Modal = class _Modal extends Component {
   }
   open(movieData) {
     this.$element.classList.add("active");
+    if (!movieData) return;
     this.setState({
       isLoading: false,
       id: movieData.id,
@@ -535,6 +455,87 @@ const _App = class _App extends Component {
 };
 __publicField(_App, "instance");
 let App = _App;
+async function fetchWithErrorHandling(url) {
+  const options = {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${"eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1NDljNDczODg1ZmVjMjQxYzIzOTNkYWVlNDkwYzMwMiIsIm5iZiI6MTc0Mjg3OTA3Ny4xOCwic3ViIjoiNjdlMjM5NjU0NDBmMzExYWNlNzVkNWEwIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.qpqb60AR3c7Qc-BOPMm-vOvEx_v4_hJETbJpmQFAnYw"}`
+    }
+  };
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      switch (response.status) {
+        case 400:
+          return {
+            error: "검색 가능한 페이지 수를 넘겼습니다."
+          };
+        case 401:
+          return {
+            error: "사용자 인증 정보가 잘못되었습니다."
+          };
+        default:
+          return {
+            error: `에러가 발생했습니다. (${response.status})`
+          };
+      }
+    }
+    return response.json();
+  } catch (error) {
+    return {
+      error: `에러가 발생했습니다. ${error}`
+    };
+  }
+}
+const MOVIE_API = {
+  BaseUrl: "https://api.themoviedb.org/3",
+  endPoints: {
+    movies: {
+      popular: "movie/popular",
+      search: "search/movie",
+      genre: "genre/movie/list"
+    }
+  },
+  defaultParams: {
+    language: "ko-KR"
+  }
+};
+const createMovieApiUrl = (endpoint, params) => {
+  const searchParams = new URLSearchParams({
+    ...MOVIE_API.defaultParams,
+    ...params
+  });
+  return `${MOVIE_API.BaseUrl}/${endpoint}?${searchParams.toString()}`;
+};
+async function getMovies({ page }) {
+  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.popular, {
+    page: String(page)
+  });
+  return fetchWithErrorHandling(url);
+}
+async function searchMovies({ page, title }) {
+  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.search, {
+    query: String(title),
+    include_adult: "false",
+    page: String(page)
+  });
+  return fetchWithErrorHandling(url);
+}
+async function getGenres() {
+  const url = createMovieApiUrl(MOVIE_API.endPoints.movies.genre);
+  return fetchWithErrorHandling(url);
+}
+const isErrorResponse = (response) => {
+  return "error" in response;
+};
+function handleApiResponse(response, callbacks) {
+  if (callbacks.onError && isErrorResponse(response)) {
+    callbacks.onError(response.error);
+    return;
+  }
+  callbacks.onSuccess(response);
+}
 const store = {
   page: 1,
   totalPages: 1,
@@ -542,39 +543,59 @@ const store = {
   searchKeyword: "",
   genres: []
 };
-let isLoading = false;
-let hasReachedEnd = false;
-const initInfiniteScroll = () => {
-  window.removeEventListener("scroll", handleScroll);
-  isLoading = false;
-  hasReachedEnd = false;
-  window.addEventListener("scroll", handleScroll);
-};
-const handleScroll = () => {
-  if (isLoading || hasReachedEnd) return;
-  checkAndLoadMoreItems();
-};
-const checkAndLoadMoreItems = () => {
-  const viewportHeight = window.innerHeight;
-  const scrollY = window.scrollY;
-  const documentHeight = document.documentElement.scrollHeight;
-  const scrolledToBottom = viewportHeight + scrollY >= documentHeight - 150;
-  if (scrolledToBottom) loadMoreItems();
-};
-const loadMoreItems = async () => {
-  if (hasReachedEnd || isLoading || store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages)) {
-    hasReachedEnd = true;
-    return;
+const _InfiniteScroll = class _InfiniteScroll {
+  constructor() {
+    __publicField(this, "isLoading", false);
+    __publicField(this, "hasReachedEnd", false);
   }
-  isLoading = true;
-  store.page = store.page + 1;
-  await updateMoviesList();
-  isLoading = false;
+  static getInstance() {
+    if (!_InfiniteScroll.instance)
+      _InfiniteScroll.instance = new _InfiniteScroll();
+    return _InfiniteScroll.instance;
+  }
+  initialize() {
+    window.removeEventListener("scroll", this.handleScroll.bind(this));
+    this.isLoading = false;
+    this.hasReachedEnd = false;
+    window.addEventListener("scroll", this.handleScroll.bind(this));
+  }
+  handleScroll() {
+    if (this.isLoading || this.hasReachedEnd) return;
+    this.checkAndLoadMoreItems();
+  }
+  checkAndLoadMoreItems() {
+    const viewportHeight = window.innerHeight;
+    const scrollY = window.scrollY;
+    const documentHeight = document.documentElement.scrollHeight;
+    const scrolledToBottom = viewportHeight + scrollY >= documentHeight - 150;
+    if (scrolledToBottom) this.loadMoreItems();
+  }
+  async loadMoreItems() {
+    if (this.hasReachedEnd || this.isLoading || store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages)) {
+      this.hasReachedEnd = true;
+      return;
+    }
+    this.isLoading = true;
+    store.page = store.page + 1;
+    await MovieRenderer.getInstance().renderMovies();
+    this.isLoading = false;
+  }
+  getIsLoading() {
+    return this.isLoading;
+  }
+  setIsLoading(value) {
+    this.isLoading = value;
+  }
+  setHasReachedEnd(value) {
+    this.hasReachedEnd = value;
+  }
 };
-const checkLastPage = () => {
+__publicField(_InfiniteScroll, "instance");
+let InfiniteScroll = _InfiniteScroll;
+const isLastPage = () => {
   return store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages);
 };
-const setHeaderData = () => {
+const updateHeaderWithFirstMovie = () => {
   const header = Header.getInstance();
   const firstMovieData = store.movies[0];
   if (!firstMovieData) return;
@@ -586,53 +607,9 @@ const setHeaderData = () => {
     isLoading: false
   });
 };
-const renderTotalList = async (main) => {
-  const moviesResponse = await getMovies({ page: store.page });
-  handleApiResponse(moviesResponse, {
-    onSuccess: (data) => {
-      store.movies = [...store.movies, ...data.results];
-      store.totalPages = data.total_pages;
-      if (checkLastPage()) hasReachedEnd = true;
-      setHeaderData();
-      main.setState({
-        movies: store.movies,
-        isLoading: false
-      });
-    },
-    onError: (error) => {
-      main.setState({
-        isLoading: false,
-        error
-      });
-      isLoading = false;
-    }
-  });
-};
-const renderSearchList = async (main) => {
-  setHeaderData();
-  const moviesResponse = await searchMovies({
-    page: store.page,
-    title: store.searchKeyword
-  });
-  handleApiResponse(moviesResponse, {
-    onSuccess: (data) => {
-      store.movies = [...store.movies, ...data.results];
-      store.totalPages = data.total_pages;
-      if (checkLastPage()) hasReachedEnd = true;
-      main.setState({
-        movies: store.movies,
-        isLoading: false,
-        error: store.movies.length === 0 ? "검색 결과가 없습니다." : null
-      });
-    },
-    onError: (error) => {
-      main.setState({
-        isLoading: false,
-        error
-      });
-      isLoading = false;
-    }
-  });
+const updateMovieStore = (data) => {
+  store.movies = [...store.movies, ...data.results];
+  store.totalPages = data.total_pages;
 };
 const getGenreList = async () => {
   const genreResponse = await getGenres();
@@ -640,132 +617,75 @@ const getGenreList = async () => {
     onSuccess: (data) => store.genres = data.genres
   });
 };
-const updateMoviesList = async () => {
-  const main = Main.getInstance();
-  if (store.searchKeyword === "") await renderTotalList(main);
-  else await renderSearchList(main);
-  main.render();
-  if (store.page === 1) initInfiniteScroll();
+const _MovieRenderer = class _MovieRenderer {
+  constructor() {
+    __publicField(this, "infiniteScroll", InfiniteScroll.getInstance());
+    __publicField(this, "main", Main.getInstance());
+    __publicField(this, "renderTotalList", async () => {
+      const moviesResponse = await getMovies({ page: store.page });
+      handleApiResponse(moviesResponse, {
+        onSuccess: (data) => {
+          updateMovieStore(data);
+          if (isLastPage()) this.infiniteScroll.setHasReachedEnd(true);
+          updateHeaderWithFirstMovie();
+          this.main.setState({
+            movies: store.movies,
+            isLoading: false
+          });
+        },
+        onError: (error) => {
+          this.main.setState({
+            isLoading: false,
+            error
+          });
+          this.infiniteScroll.setIsLoading(false);
+        }
+      });
+    });
+    __publicField(this, "renderSearchList", async () => {
+      updateHeaderWithFirstMovie();
+      const moviesResponse = await searchMovies({
+        page: store.page,
+        title: store.searchKeyword
+      });
+      handleApiResponse(moviesResponse, {
+        onSuccess: (data) => {
+          updateMovieStore(data);
+          if (isLastPage()) this.infiniteScroll.setHasReachedEnd(true);
+          this.main.setState({
+            movies: store.movies,
+            isLoading: false,
+            error: store.movies.length === 0 ? "검색 결과가 없습니다." : null
+          });
+        },
+        onError: (error) => {
+          this.main.setState({
+            isLoading: false,
+            error
+          });
+          this.infiniteScroll.setIsLoading(false);
+        }
+      });
+    });
+  }
+  static getInstance() {
+    if (!_MovieRenderer.instance) _MovieRenderer.instance = new _MovieRenderer();
+    return _MovieRenderer.instance;
+  }
+  async renderMovies() {
+    if (store.searchKeyword === "") await this.renderTotalList();
+    else await this.renderSearchList();
+    this.main.render();
+    if (store.page === 1) this.infiniteScroll.initialize();
+  }
 };
+__publicField(_MovieRenderer, "instance");
+let MovieRenderer = _MovieRenderer;
 const initializeLayout = async () => {
   const $app = document.querySelector("#app");
   $app == null ? void 0 : $app.append(App.getInstance().getElement());
-  await updateMoviesList();
+  await MovieRenderer.getInstance().renderMovies();
 };
-const _EventBus = class _EventBus {
-  constructor() {
-    __publicField(this, "events");
-    this.events = /* @__PURE__ */ new Map();
-  }
-  static getInstance() {
-    if (!_EventBus.instance) {
-      _EventBus.instance = new _EventBus();
-    }
-    return _EventBus.instance;
-  }
-  on(eventType, handler) {
-    if (!this.events.has(eventType)) {
-      this.events.set(eventType, []);
-    }
-    const handlers = this.events.get(eventType);
-    if (handlers) handlers.push(handler);
-  }
-  emit(eventType, ...args) {
-    if (!this.events.has(eventType)) return;
-    const handlers = this.events.get(eventType);
-    if (handlers) handlers.forEach((handler) => handler(...args));
-  }
-};
-__publicField(_EventBus, "instance");
-let EventBus = _EventBus;
-const isElement = (target) => {
-  return target instanceof Element;
-};
-const isHTMLElement = (target) => {
-  return target instanceof HTMLElement;
-};
-const isForm = (target) => {
-  return target instanceof HTMLFormElement;
-};
-const isInput = (target) => {
-  return target instanceof HTMLInputElement;
-};
-const isImage = (target) => {
-  return target instanceof HTMLImageElement;
-};
-const EVENT_TYPES = {
-  modalOpen: "modal-open",
-  modalClose: "modal-close",
-  search: "search",
-  setRating: "set-rating"
-};
-const eventBus$1 = EventBus.getInstance();
-const SELECTORS = {
-  closeModalButton: "#closeModal",
-  modalBackground: ".modal-background",
-  movieItem: ".thumbnail-list .item, .top-rated-button",
-  searchInput: ".top-rated-search-input",
-  ratingStar: ".star"
-};
-window.addEventListener("click", async (event) => {
-  const { target } = event;
-  if (!isElement(target)) return;
-  const elementMap = [
-    {
-      selector: SELECTORS.closeModalButton,
-      action: () => eventBus$1.emit(EVENT_TYPES.modalClose),
-      matchMethod: "closest"
-    },
-    {
-      selector: SELECTORS.modalBackground,
-      action: () => eventBus$1.emit(EVENT_TYPES.modalClose),
-      matchMethod: "matches"
-    },
-    {
-      selector: SELECTORS.movieItem,
-      action: (movieItem) => {
-        if (!movieItem || !isHTMLElement(movieItem)) return;
-        const movieId = Number(movieItem.dataset.movieId);
-        if (!movieId) return;
-        eventBus$1.emit(EVENT_TYPES.modalOpen, movieId);
-      },
-      matchMethod: "closest"
-    },
-    {
-      selector: SELECTORS.ratingStar,
-      action: (starImg) => {
-        if (!starImg || !isImage(starImg)) return;
-        const newRating = Number(starImg.dataset.value);
-        eventBus$1.emit(EVENT_TYPES.setRating, newRating);
-      },
-      matchMethod: "closest"
-    }
-  ];
-  for (const { selector, action, matchMethod } of elementMap) {
-    const element = matchMethod === "matches" ? target.matches(selector) ? target : null : target.closest(selector);
-    if (!element) continue;
-    action(element);
-    return;
-  }
-});
-window.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const { target } = event;
-  if (!isForm(target)) return;
-  const $searchInput = target.querySelector(SELECTORS.searchInput);
-  if (!isInput($searchInput)) return;
-  const keyword = $searchInput.value.trim();
-  if (!keyword) return;
-  target.reset();
-  eventBus$1.emit(EVENT_TYPES.search, keyword);
-});
-window.addEventListener("keydown", (event) => {
-  if (event.defaultPrevented) return;
-  if (["Escape", "Esc"].includes(event.key) && Modal.getInstance().isActive()) {
-    eventBus$1.emit(EVENT_TYPES.modalClose);
-    event.preventDefault();
-  }
-});
 class LocalStorage {
   get(key) {
     const item = localStorage.getItem(key);
@@ -819,9 +739,50 @@ const _UserMovieRatingStorage = class _UserMovieRatingStorage {
 __publicField(_UserMovieRatingStorage, "instance");
 __publicField(_UserMovieRatingStorage, "MOVIE_RATING_KEY", "movieRatingKey");
 let UserMovieRatingStorage = _UserMovieRatingStorage;
-const eventBus = EventBus.getInstance();
-eventBus.on(EVENT_TYPES.modalOpen, async (movieId) => {
+const _EventBus = class _EventBus {
+  constructor() {
+    __publicField(this, "events");
+    this.events = /* @__PURE__ */ new Map();
+  }
+  static getInstance() {
+    if (!_EventBus.instance) {
+      _EventBus.instance = new _EventBus();
+    }
+    return _EventBus.instance;
+  }
+  on(eventType, handler) {
+    if (!this.events.has(eventType)) {
+      this.events.set(eventType, []);
+    }
+    const handlers = this.events.get(eventType);
+    if (handlers) handlers.push(handler);
+  }
+  emit(eventType, ...args) {
+    if (!this.events.has(eventType)) return;
+    const handlers = this.events.get(eventType);
+    if (handlers) handlers.forEach((handler) => handler(...args));
+  }
+};
+__publicField(_EventBus, "instance");
+let EventBus = _EventBus;
+const EVENT_TYPES = {
+  modalOpen: "modal-open",
+  modalClose: "modal-close",
+  search: "search",
+  setRating: "set-rating"
+};
+const eventBus$1 = EventBus.getInstance();
+function initializeEventHandlers() {
+  eventBus$1.on(EVENT_TYPES.modalOpen, handleModalOpen);
+  eventBus$1.on(EVENT_TYPES.modalClose, handleModalClose);
+  eventBus$1.on(EVENT_TYPES.search, handleSearch);
+  eventBus$1.on(EVENT_TYPES.setRating, handleSetRating);
+}
+async function handleModalOpen(movieId) {
   var _a;
+  const modal = Modal.getInstance();
+  modal.setState({ isLoading: true });
+  modal.open();
   const movieData = store.movies.find((m) => m.id === movieId);
   if (!movieData) return;
   await getGenreList();
@@ -848,12 +809,12 @@ eventBus.on(EVENT_TYPES.modalOpen, async (movieId) => {
     isLoading: false,
     my_rate: myRate
   };
-  Modal.getInstance().open(finalMovieData);
-});
-eventBus.on(EVENT_TYPES.modalClose, () => {
+  modal.open(finalMovieData);
+}
+function handleModalClose() {
   Modal.getInstance().close();
-});
-eventBus.on(EVENT_TYPES.search, async (value) => {
+}
+async function handleSearch(value) {
   store.searchKeyword = value;
   store.page = 1;
   store.movies = [];
@@ -863,9 +824,9 @@ eventBus.on(EVENT_TYPES.search, async (value) => {
     isLoading: true
   });
   Header.getInstance().setState({ hasSearched: true });
-  await updateMoviesList();
-});
-eventBus.on(EVENT_TYPES.setRating, (newRating) => {
+  await MovieRenderer.getInstance().renderMovies();
+}
+function handleSetRating(newRating) {
   const currentMovieId = Modal.getInstance().getMovieId();
   if (!currentMovieId) return;
   UserMovieRatingStorage.getInstance().setRating({
@@ -873,7 +834,96 @@ eventBus.on(EVENT_TYPES.setRating, (newRating) => {
     rate: newRating
   });
   Modal.getInstance().setState({ my_rate: newRating });
-});
+}
+const isElement = (target) => {
+  return target instanceof Element;
+};
+const isHTMLElement = (target) => {
+  return target instanceof HTMLElement;
+};
+const isForm = (target) => {
+  return target instanceof HTMLFormElement;
+};
+const isInput = (target) => {
+  return target instanceof HTMLInputElement;
+};
+const isImage = (target) => {
+  return target instanceof HTMLImageElement;
+};
+const eventBus = EventBus.getInstance();
+const SELECTORS = {
+  closeModalButton: "#closeModal",
+  modalBackground: ".modal-background",
+  movieItem: ".thumbnail-list .item, .top-rated-button",
+  searchInput: ".top-rated-search-input",
+  ratingStar: ".star"
+};
+function initializeDomEventListener() {
+  window.addEventListener("click", handleClick);
+  window.addEventListener("submit", handleSubmit);
+  window.addEventListener("keydown", handleKeydown);
+}
+function handleClick(event) {
+  const { target } = event;
+  if (!isElement(target)) return;
+  const elementMap = [
+    {
+      selector: SELECTORS.closeModalButton,
+      action: () => eventBus.emit(EVENT_TYPES.modalClose),
+      matchMethod: "closest"
+    },
+    {
+      selector: SELECTORS.modalBackground,
+      action: () => eventBus.emit(EVENT_TYPES.modalClose),
+      matchMethod: "matches"
+    },
+    {
+      selector: SELECTORS.movieItem,
+      action: (movieItem) => {
+        if (!movieItem || !isHTMLElement(movieItem)) return;
+        const movieId = Number(movieItem.dataset.movieId);
+        if (!movieId) return;
+        eventBus.emit(EVENT_TYPES.modalOpen, movieId);
+      },
+      matchMethod: "closest"
+    },
+    {
+      selector: SELECTORS.ratingStar,
+      action: (starImg) => {
+        if (!starImg || !isImage(starImg)) return;
+        const newRating = Number(starImg.dataset.value);
+        eventBus.emit(EVENT_TYPES.setRating, newRating);
+      },
+      matchMethod: "closest"
+    }
+  ];
+  for (const { selector, action, matchMethod } of elementMap) {
+    const element = matchMethod === "matches" ? target.matches(selector) ? target : null : target.closest(selector);
+    if (!element) continue;
+    action(element);
+    return;
+  }
+}
+function handleSubmit(event) {
+  event.preventDefault();
+  const { target } = event;
+  if (!isForm(target)) return;
+  const $searchInput = target.querySelector(SELECTORS.searchInput);
+  if (!isInput($searchInput)) return;
+  const keyword = $searchInput.value.trim();
+  if (!keyword) return;
+  target.reset();
+  eventBus.emit(EVENT_TYPES.search, keyword);
+}
+function handleKeydown(event) {
+  if (event.defaultPrevented) return;
+  if (["Escape", "Esc"].includes(event.key) && Modal.getInstance().isActive()) {
+    eventBus.emit(EVENT_TYPES.modalClose);
+    event.preventDefault();
+  }
+}
 addEventListener("load", () => {
   initializeLayout();
+  initializeDomEventListener();
+  initializeEventHandlers();
 });
