@@ -107,9 +107,13 @@ function Skeleton({
   $skeletonContainer.className = `skeleton ${className}`.trim();
   $skeletonContainer.style.width = typeof width === "number" ? `${width}px` : width;
   $skeletonContainer.style.height = typeof height === "number" ? `${height}px` : height;
-  Object.entries(style).forEach(([key, value]) => {
+  Object.entries(style).forEach(([property, value]) => {
+    const cssProperty = property.replace(
+      /[A-Z]/g,
+      (match) => `-${match.toLowerCase()}`
+    );
     if (value !== void 0 && value !== null) {
-      $skeletonContainer.style.setProperty(key, String(value));
+      $skeletonContainer.style.setProperty(cssProperty, String(value));
     }
   });
   return $skeletonContainer;
@@ -226,7 +230,11 @@ const _Main = class _Main extends Component {
       <li>
         <div class="item">
           ${Skeleton({
-        className: "thumbnail-skeleton"
+        width: "100%",
+        height: "auto",
+        style: {
+          aspectRatio: "2/3"
+        }
       }).outerHTML}
           <div class="item-desc">
             ${Skeleton({ width: "30%", height: 15 }).outerHTML}
