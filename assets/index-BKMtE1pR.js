@@ -463,6 +463,9 @@ const _App = class _App extends Component {
 };
 __publicField(_App, "instance");
 let App = _App;
+function c(n, ...t) {
+  return (r) => t.reduce((n2, t2) => t2(n2), n(r));
+}
 async function fetchWithErrorHandling(url) {
   const options = {
     method: "GET",
@@ -690,6 +693,31 @@ const _MovieService = class _MovieService {
     __publicField(this, "pagination", Pagination.getInstance());
     __publicField(this, "search", Search.getInstance());
     __publicField(this, "infiniteScroll", new InfiniteScroll());
+    __publicField(this, "processSuccessResponse", (data) => {
+      return c(
+        (data2) => this.updateFromResponse(data2),
+        () => {
+          if (this.pagination.hasReachedEnd())
+            this.infiniteScroll.setHasReachedEnd(true);
+        },
+        () => {
+          this.main.setState({
+            movies: this.movies.movies,
+            isLoading: false,
+            error: this.movies.isEmpty() ? "검색 결과가 없습니다." : null
+          });
+        }
+      )(data);
+    });
+    __publicField(this, "processErrorResponse", (error) => {
+      return c(
+        (error2) => this.main.setState({
+          isLoading: false,
+          error: error2
+        }),
+        () => this.infiniteScroll.setIsLoading(false)
+      )(error);
+    });
   }
   static getInstance() {
     if (!_MovieService.instance) _MovieService.instance = new _MovieService();
@@ -707,22 +735,10 @@ const _MovieService = class _MovieService {
     });
     handleApiResponse(moviesResponse, {
       onSuccess: (data) => {
-        this.updateFromResponse(data);
-        if (this.pagination.hasReachedEnd())
-          this.infiniteScroll.setHasReachedEnd(true);
+        this.processSuccessResponse(data);
         this.updateHeaderWithFirstMovie();
-        this.main.setState({
-          movies: this.movies.movies,
-          isLoading: false
-        });
       },
-      onError: (error) => {
-        this.main.setState({
-          isLoading: false,
-          error
-        });
-        this.infiniteScroll.setIsLoading(false);
-      }
+      onError: (error) => this.processErrorResponse(error)
     });
   }
   async renderSearchList() {
@@ -732,23 +748,8 @@ const _MovieService = class _MovieService {
       title: this.search.searchKeyword
     });
     handleApiResponse(moviesResponse, {
-      onSuccess: (data) => {
-        this.updateFromResponse(data);
-        if (this.pagination.hasReachedEnd())
-          this.infiniteScroll.setHasReachedEnd(true);
-        this.main.setState({
-          movies: this.movies.movies,
-          isLoading: false,
-          error: this.movies.isEmpty() ? "검색 결과가 없습니다." : null
-        });
-      },
-      onError: (error) => {
-        this.main.setState({
-          isLoading: false,
-          error
-        });
-        this.infiniteScroll.setIsLoading(false);
-      }
+      onSuccess: (data) => this.processSuccessResponse(data),
+      onError: (error) => this.processErrorResponse(error)
     });
   }
   updateHeaderWithFirstMovie() {
