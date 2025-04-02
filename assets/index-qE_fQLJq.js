@@ -544,32 +544,116 @@ function handleApiResponse(response, callbacks) {
   }
   callbacks.onSuccess(response);
 }
-const store = {
-  page: 1,
-  totalPages: 1,
-  movies: [],
-  searchKeyword: "",
-  genres: []
-};
-const _InfiniteScroll = class _InfiniteScroll {
+const _Movies = class _Movies {
   constructor() {
-    __publicField(this, "isLoading", false);
-    __publicField(this, "hasReachedEnd", false);
+    __publicField(this, "_movies", []);
   }
   static getInstance() {
-    if (!_InfiniteScroll.instance)
-      _InfiniteScroll.instance = new _InfiniteScroll();
-    return _InfiniteScroll.instance;
+    if (!_Movies.instance) _Movies.instance = new _Movies();
+    return _Movies.instance;
+  }
+  get movies() {
+    return [...this._movies];
+  }
+  updateMovies(data) {
+    this._movies = [...this._movies, ...data.results];
+  }
+  getFirstMovie() {
+    return this._movies[0];
+  }
+  findMovieById(id) {
+    return this._movies.find((movie) => movie.id === id);
+  }
+  isEmpty() {
+    return this._movies.length === 0;
+  }
+  reset() {
+    this._movies = [];
+  }
+};
+__publicField(_Movies, "instance");
+let Movies = _Movies;
+const _Pagination = class _Pagination {
+  constructor() {
+    __publicField(this, "_currentPage", 1);
+    __publicField(this, "_totalPages", 1);
+    __publicField(this, "_maxPage", MAX_MOVIE_PAGE);
+  }
+  static getInstance() {
+    if (!_Pagination.instance) _Pagination.instance = new _Pagination();
+    return _Pagination.instance;
+  }
+  get currentPage() {
+    return this._currentPage;
+  }
+  updateTotalPages(totalPages) {
+    this._totalPages = totalPages;
+  }
+  nextPage() {
+    if (!this.hasReachedEnd()) this._currentPage += 1;
+    return this._currentPage;
+  }
+  hasReachedEnd() {
+    return this._currentPage >= Math.min(this._maxPage, this._totalPages);
+  }
+  isFirstPage() {
+    return this._currentPage === 1;
+  }
+  resetCurrentPage() {
+    this._currentPage = 1;
+  }
+};
+__publicField(_Pagination, "instance");
+let Pagination = _Pagination;
+const _Search = class _Search {
+  constructor() {
+    __publicField(this, "_searchKeyword", "");
+  }
+  static getInstance() {
+    if (!_Search.instance) _Search.instance = new _Search();
+    return _Search.instance;
+  }
+  get searchKeyword() {
+    return this._searchKeyword;
+  }
+  updateSearchKeyword(searchKeyword) {
+    this._searchKeyword = searchKeyword;
+  }
+  hasSearchKeyword() {
+    return this._searchKeyword !== "";
+  }
+};
+__publicField(_Search, "instance");
+let Search = _Search;
+class InfiniteScroll {
+  constructor() {
+    __publicField(this, "pagination", Pagination.getInstance());
+    __publicField(this, "isLoading", false);
+    __publicField(this, "hasReachedEnd", false);
+    __publicField(this, "lastScrollY", 0);
+    __publicField(this, "scrollTimeout", null);
   }
   initialize() {
-    window.removeEventListener("scroll", this.handleScroll.bind(this));
+    this.cleanup();
     this.isLoading = false;
     this.hasReachedEnd = false;
-    window.addEventListener("scroll", this.handleScroll.bind(this));
+    this.lastScrollY = window.scrollY;
+    window.addEventListener("scroll", this.handleScroll.bind(this), {
+      passive: true
+    });
   }
   handleScroll() {
     if (this.isLoading || this.hasReachedEnd) return;
-    this.checkAndLoadMoreItems();
+    const currentScrollY = window.scrollY;
+    const isScrollingDown = currentScrollY > this.lastScrollY;
+    this.lastScrollY = currentScrollY;
+    if (!isScrollingDown) return;
+    if (this.scrollTimeout === null) {
+      this.scrollTimeout = window.setTimeout(() => {
+        this.checkAndLoadMoreItems();
+        this.scrollTimeout = null;
+      }, 400);
+    }
   }
   checkAndLoadMoreItems() {
     const viewportHeight = window.innerHeight;
@@ -579,17 +663,14 @@ const _InfiniteScroll = class _InfiniteScroll {
     if (scrolledToBottom) this.loadMoreItems();
   }
   async loadMoreItems() {
-    if (this.hasReachedEnd || this.isLoading || store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages)) {
+    if (this.hasReachedEnd || this.isLoading || this.pagination.hasReachedEnd()) {
       this.hasReachedEnd = true;
       return;
     }
     this.isLoading = true;
-    store.page = store.page + 1;
-    await MovieRenderer.getInstance().renderMovies();
+    this.pagination.nextPage();
+    await MovieService.getInstance().renderMovies();
     this.isLoading = false;
-  }
-  getIsLoading() {
-    return this.isLoading;
   }
   setIsLoading(value) {
     this.isLoading = value;
@@ -597,103 +678,123 @@ const _InfiniteScroll = class _InfiniteScroll {
   setHasReachedEnd(value) {
     this.hasReachedEnd = value;
   }
-};
-__publicField(_InfiniteScroll, "instance");
-let InfiniteScroll = _InfiniteScroll;
-const isLastPage = () => {
-  return store.page >= Math.min(MAX_MOVIE_PAGE, store.totalPages);
-};
-const updateHeaderWithFirstMovie = () => {
-  const header = Header.getInstance();
-  const firstMovieData = store.movies[0];
-  if (!firstMovieData) return;
-  header.setState({
-    id: firstMovieData.id,
-    posterImage: `${PREFIX_POSTER_PATH}${firstMovieData.poster_path}`,
-    title: firstMovieData.title,
-    voteAverage: firstMovieData.vote_average,
-    isLoading: false
-  });
-};
-const updateMovieStore = (data) => {
-  store.movies = [...store.movies, ...data.results];
-  store.totalPages = data.total_pages;
-};
-const getGenreList = async () => {
-  const genreResponse = await getGenres();
-  handleApiResponse(genreResponse, {
-    onSuccess: (data) => store.genres = data.genres
-  });
-};
-const _MovieRenderer = class _MovieRenderer {
+  cleanup() {
+    window.removeEventListener("scroll", this.handleScroll.bind(this));
+    if (this.scrollTimeout !== null) clearTimeout(this.scrollTimeout);
+  }
+}
+const _MovieService = class _MovieService {
   constructor() {
-    __publicField(this, "infiniteScroll", InfiniteScroll.getInstance());
     __publicField(this, "main", Main.getInstance());
-    __publicField(this, "renderTotalList", async () => {
-      const moviesResponse = await getMovies({ page: store.page });
-      handleApiResponse(moviesResponse, {
-        onSuccess: (data) => {
-          updateMovieStore(data);
-          if (isLastPage()) this.infiniteScroll.setHasReachedEnd(true);
-          updateHeaderWithFirstMovie();
-          this.main.setState({
-            movies: store.movies,
-            isLoading: false
-          });
-        },
-        onError: (error) => {
-          this.main.setState({
-            isLoading: false,
-            error
-          });
-          this.infiniteScroll.setIsLoading(false);
-        }
-      });
-    });
-    __publicField(this, "renderSearchList", async () => {
-      updateHeaderWithFirstMovie();
-      const moviesResponse = await searchMovies({
-        page: store.page,
-        title: store.searchKeyword
-      });
-      handleApiResponse(moviesResponse, {
-        onSuccess: (data) => {
-          updateMovieStore(data);
-          if (isLastPage()) this.infiniteScroll.setHasReachedEnd(true);
-          this.main.setState({
-            movies: store.movies,
-            isLoading: false,
-            error: store.movies.length === 0 ? "검색 결과가 없습니다." : null
-          });
-        },
-        onError: (error) => {
-          this.main.setState({
-            isLoading: false,
-            error
-          });
-          this.infiniteScroll.setIsLoading(false);
-        }
-      });
-    });
+    __publicField(this, "movies", Movies.getInstance());
+    __publicField(this, "pagination", Pagination.getInstance());
+    __publicField(this, "search", Search.getInstance());
+    __publicField(this, "infiniteScroll", new InfiniteScroll());
   }
   static getInstance() {
-    if (!_MovieRenderer.instance) _MovieRenderer.instance = new _MovieRenderer();
-    return _MovieRenderer.instance;
+    if (!_MovieService.instance) _MovieService.instance = new _MovieService();
+    return _MovieService.instance;
   }
   async renderMovies() {
-    if (store.searchKeyword === "") await this.renderTotalList();
+    if (!this.search.hasSearchKeyword()) await this.renderTotalList();
     else await this.renderSearchList();
     this.main.render();
-    if (store.page === 1) this.infiniteScroll.initialize();
+    if (this.pagination.isFirstPage()) this.infiniteScroll.initialize();
+  }
+  async renderTotalList() {
+    const moviesResponse = await getMovies({
+      page: this.pagination.currentPage
+    });
+    handleApiResponse(moviesResponse, {
+      onSuccess: (data) => {
+        this.updateFromResponse(data);
+        if (this.pagination.hasReachedEnd())
+          this.infiniteScroll.setHasReachedEnd(true);
+        this.updateHeaderWithFirstMovie();
+        this.main.setState({
+          movies: this.movies.movies,
+          isLoading: false
+        });
+      },
+      onError: (error) => {
+        this.main.setState({
+          isLoading: false,
+          error
+        });
+        this.infiniteScroll.setIsLoading(false);
+      }
+    });
+  }
+  async renderSearchList() {
+    this.updateHeaderWithFirstMovie();
+    const moviesResponse = await searchMovies({
+      page: this.pagination.currentPage,
+      title: this.search.searchKeyword
+    });
+    handleApiResponse(moviesResponse, {
+      onSuccess: (data) => {
+        this.updateFromResponse(data);
+        if (this.pagination.hasReachedEnd())
+          this.infiniteScroll.setHasReachedEnd(true);
+        this.main.setState({
+          movies: this.movies.movies,
+          isLoading: false,
+          error: this.movies.isEmpty() ? "검색 결과가 없습니다." : null
+        });
+      },
+      onError: (error) => {
+        this.main.setState({
+          isLoading: false,
+          error
+        });
+        this.infiniteScroll.setIsLoading(false);
+      }
+    });
+  }
+  updateHeaderWithFirstMovie() {
+    const header2 = Header.getInstance();
+    const firstMovieData = this.movies.getFirstMovie();
+    if (!firstMovieData) return;
+    header2.setState({
+      id: firstMovieData.id,
+      posterImage: `${PREFIX_POSTER_PATH}${firstMovieData.poster_path}`,
+      title: firstMovieData.title,
+      voteAverage: firstMovieData.vote_average,
+      isLoading: false
+    });
+  }
+  updateFromResponse(data) {
+    this.movies.updateMovies(data);
+    this.pagination.updateTotalPages(data.total_pages);
   }
 };
-__publicField(_MovieRenderer, "instance");
-let MovieRenderer = _MovieRenderer;
+__publicField(_MovieService, "instance");
+let MovieService = _MovieService;
 const initializeLayout = async () => {
   const $app = document.querySelector("#app");
   $app == null ? void 0 : $app.append(App.getInstance().getElement());
-  await MovieRenderer.getInstance().renderMovies();
+  await MovieService.getInstance().renderMovies();
 };
+const _Genres = class _Genres {
+  constructor() {
+    __publicField(this, "_genres", []);
+  }
+  static getInstance() {
+    if (!_Genres.instance) _Genres.instance = new _Genres();
+    return _Genres.instance;
+  }
+  async setGenres() {
+    const genreResponse = await getGenres();
+    handleApiResponse(genreResponse, {
+      onSuccess: (data) => this._genres = data.genres
+    });
+  }
+  getGenreNamesByIds(genreIds) {
+    return this._genres.filter((genre) => genreIds.includes(genre.id)).map((genre) => genre.name);
+  }
+};
+__publicField(_Genres, "instance");
+let Genres = _Genres;
 class LocalStorage {
   get(key) {
     const item = localStorage.getItem(key);
@@ -743,6 +844,10 @@ const _UserMovieRatingStorage = class _UserMovieRatingStorage {
   clearAllRatings() {
     this.storage.remove(_UserMovieRatingStorage.MOVIE_RATING_KEY);
   }
+  findRatingById(movieId) {
+    var _a;
+    return ((_a = this.getRatings().find((rating) => rating.movieId === movieId)) == null ? void 0 : _a.rate) ?? 0;
+  }
 };
 __publicField(_UserMovieRatingStorage, "instance");
 __publicField(_UserMovieRatingStorage, "MOVIE_RATING_KEY", "movieRatingKey");
@@ -765,35 +870,48 @@ const _EventBus = class _EventBus {
     const handlers = this.events.get(eventType);
     if (handlers) handlers.push(handler);
   }
-  emit(eventType, ...args) {
+  emit(eventType, data) {
     if (!this.events.has(eventType)) return;
     const handlers = this.events.get(eventType);
-    if (handlers) handlers.forEach((handler) => handler(...args));
+    if (handlers) handlers.forEach((handler) => handler(data));
   }
 };
 __publicField(_EventBus, "instance");
 let EventBus = _EventBus;
 const EVENT_TYPES = {
-  modalOpen: "modal-open",
-  modalClose: "modal-close",
-  search: "search",
-  setRating: "set-rating"
+  modal: {
+    open: "MODAL_OPEN",
+    close: "MODAL_CLOSE"
+  },
+  search: {
+    submit: "SEARCH_SUBMIT"
+  },
+  movie: {
+    setRating: "SET_RATING"
+  }
 };
 const eventBus$1 = EventBus.getInstance();
-function initializeEventHandlers() {
-  eventBus$1.on(EVENT_TYPES.modalOpen, handleModalOpen);
-  eventBus$1.on(EVENT_TYPES.modalClose, handleModalClose);
-  eventBus$1.on(EVENT_TYPES.search, handleSearch);
-  eventBus$1.on(EVENT_TYPES.setRating, handleSetRating);
+const movieRating = UserMovieRatingStorage.getInstance();
+const movieService = MovieService.getInstance();
+const modal = Modal.getInstance();
+const header = Header.getInstance();
+const main = Main.getInstance();
+const movies = Movies.getInstance();
+const genres = Genres.getInstance();
+const pagination = Pagination.getInstance();
+const search = Search.getInstance();
+function initializeEventHandler() {
+  eventBus$1.on(EVENT_TYPES.modal.open, handleModalOpen);
+  eventBus$1.on(EVENT_TYPES.modal.close, handleModalClose);
+  eventBus$1.on(EVENT_TYPES.search.submit, handleSearch);
+  eventBus$1.on(EVENT_TYPES.movie.setRating, handleSetRating);
 }
 async function handleModalOpen(movieId) {
-  var _a;
-  const modal = Modal.getInstance();
   modal.setState({ isLoading: true });
   modal.open();
-  const movieData = store.movies.find((m) => m.id === movieId);
+  const movieData = movies.findMovieById(movieId);
   if (!movieData) return;
-  await getGenreList();
+  await genres.setGenres();
   const {
     genre_ids,
     title,
@@ -802,17 +920,16 @@ async function handleModalOpen(movieId) {
     overview,
     release_date
   } = movieData;
-  const genres = store.genres.filter(({ id }) => genre_ids.includes(id)).map(({ name }) => name);
+  const genreNames = genres.getGenreNamesByIds(genre_ids);
   const releaseDate = release_date.split("-")[0];
-  const ratings = UserMovieRatingStorage.getInstance().getRatings();
-  const myRate = ((_a = ratings.find((r) => r.movieId === movieId)) == null ? void 0 : _a.rate) ?? 0;
+  const myRate = movieRating.findRatingById(movieId);
   const finalMovieData = {
     id: movieId,
     title,
     poster_path,
     vote_average,
     overview,
-    genres,
+    genres: genreNames,
     release_date: releaseDate,
     isLoading: false,
     my_rate: myRate
@@ -820,28 +937,27 @@ async function handleModalOpen(movieId) {
   modal.open(finalMovieData);
 }
 function handleModalClose() {
-  Modal.getInstance().close();
+  modal.close();
 }
 async function handleSearch(value) {
-  store.searchKeyword = value;
-  store.page = 1;
-  store.movies = [];
-  const main = Main.getInstance();
+  search.updateSearchKeyword(value);
+  pagination.resetCurrentPage();
+  movies.reset();
   main.setState({
-    title: `"${store.searchKeyword}" 검색 결과`,
+    title: `"${search.searchKeyword}" 검색 결과`,
     isLoading: true
   });
-  Header.getInstance().setState({ hasSearched: true });
-  await MovieRenderer.getInstance().renderMovies();
+  header.setState({ hasSearched: true });
+  await movieService.renderMovies();
 }
 function handleSetRating(newRating) {
-  const currentMovieId = Modal.getInstance().getMovieId();
+  const currentMovieId = modal.getMovieId();
   if (!currentMovieId) return;
-  UserMovieRatingStorage.getInstance().setRating({
+  movieRating.setRating({
     movieId: currentMovieId,
     rate: newRating
   });
-  Modal.getInstance().setState({ my_rate: newRating });
+  modal.setState({ my_rate: newRating });
 }
 const isElement = (target) => {
   return target instanceof Element;
@@ -871,18 +987,17 @@ function initializeDomEventListener() {
   window.addEventListener("submit", handleSubmit);
   window.addEventListener("keydown", handleKeydown);
 }
-function handleClick(event) {
-  const { target } = event;
+function handleClick({ target }) {
   if (!isElement(target)) return;
   const elementMap = [
     {
       selector: SELECTORS.closeModalButton,
-      action: () => eventBus.emit(EVENT_TYPES.modalClose),
+      action: () => eventBus.emit(EVENT_TYPES.modal.close),
       matchMethod: "closest"
     },
     {
       selector: SELECTORS.modalBackground,
-      action: () => eventBus.emit(EVENT_TYPES.modalClose),
+      action: () => eventBus.emit(EVENT_TYPES.modal.close),
       matchMethod: "matches"
     },
     {
@@ -891,7 +1006,7 @@ function handleClick(event) {
         if (!movieItem || !isHTMLElement(movieItem)) return;
         const movieId = Number(movieItem.dataset.movieId);
         if (!movieId) return;
-        eventBus.emit(EVENT_TYPES.modalOpen, movieId);
+        eventBus.emit(EVENT_TYPES.modal.open, movieId);
       },
       matchMethod: "closest"
     },
@@ -900,7 +1015,7 @@ function handleClick(event) {
       action: (starImg) => {
         if (!starImg || !isImage(starImg)) return;
         const newRating = Number(starImg.dataset.value);
-        eventBus.emit(EVENT_TYPES.setRating, newRating);
+        eventBus.emit(EVENT_TYPES.movie.setRating, newRating);
       },
       matchMethod: "closest"
     }
@@ -921,17 +1036,17 @@ function handleSubmit(event) {
   const keyword = $searchInput.value.trim();
   if (!keyword) return;
   target.reset();
-  eventBus.emit(EVENT_TYPES.search, keyword);
+  eventBus.emit(EVENT_TYPES.search.submit, keyword);
 }
 function handleKeydown(event) {
   if (event.defaultPrevented) return;
   if (["Escape", "Esc"].includes(event.key) && Modal.getInstance().isActive()) {
-    eventBus.emit(EVENT_TYPES.modalClose);
+    eventBus.emit(EVENT_TYPES.modal.close);
     event.preventDefault();
   }
 }
 addEventListener("load", () => {
   initializeLayout();
   initializeDomEventListener();
-  initializeEventHandlers();
+  initializeEventHandler();
 });
