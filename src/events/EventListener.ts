@@ -1,4 +1,4 @@
-import Modal, { ratingType } from "../components/layout/Modal";
+import Modal from "../components/layout/Modal";
 import EventBus from "./EventBus";
 import {
   isElement,
@@ -6,6 +6,7 @@ import {
   isHTMLElement,
   isImage,
   isInput,
+  isRatingType,
 } from "./utils/guards";
 import { EVENT_TYPES } from "./types/eventTypes";
 
@@ -56,8 +57,9 @@ function handleClick({ target }: MouseEvent) {
       selector: SELECTORS.ratingStar,
       action: (starImg: Element | null) => {
         if (!starImg || !isImage(starImg)) return;
-        const newRating = Number(starImg.dataset.value) as ratingType;
+        const newRating = Number(starImg.dataset.value);
 
+        if (!isRatingType(newRating)) return;
         eventBus.emit(EVENT_TYPES.movie.setRating, newRating);
       },
       matchMethod: "closest",

@@ -1,3 +1,5 @@
+import { ratingType } from "./../../components/layout/Modal";
+
 export const isElement = (target: EventTarget | null): target is Element => {
   return target instanceof Element;
 };
@@ -24,4 +26,8 @@ export const isImage = (
   target: EventTarget | null
 ): target is HTMLImageElement => {
   return target instanceof HTMLImageElement;
+};
+
+export const isRatingType = (value: unknown): value is ratingType => {
+  return typeof value === "number" && [0, 2, 4, 6, 8, 10].includes(value);
 };
